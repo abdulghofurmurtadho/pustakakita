@@ -18,7 +18,7 @@ interface PerformanceChartProps {
   multiScaleResults: MultiScaleSortRow[];
 }
 
-const BAR_COLORS = ['#064E3B', '#1E3A8A', '#D97706'];
+const BAR_COLORS = ['#064E3B', '#1E3A8A', '#D97706', '#991B1B'];
 
 const THEORETICAL_COMPLEXITY: Record<
   string,
@@ -27,6 +27,7 @@ const THEORETICAL_COMPLEXITY: Record<
   'Quick Sort': { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n²)' },
   'Merge Sort': { best: 'O(n log n)', avg: 'O(n log n)', worst: 'O(n log n)' },
   'Insertion Sort': { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
+  'Bubble Sort': { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)' },
 };
 
 export function PerformanceChart({

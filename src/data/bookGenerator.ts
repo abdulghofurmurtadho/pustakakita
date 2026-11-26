@@ -24,6 +24,8 @@ export const COVER_COLOR_PALETTE: { label: string; hex: string }[] = [
 const TITLE_PREFIXES_BY_CATEGORY: Record<BookCategory, string[]> = {
   'Teknologi & Komputer': [
     'Algoritma & Struktur Data',
+    'Basis Data Lanjut',
+    'Teknologi Informasi Modern',
     'Arsitektur Sistem Terdistribusi',
     'Kecerdasan Buatan Modern',
     'Rekayasa Perangkat Lunak',
@@ -32,22 +34,21 @@ const TITLE_PREFIXES_BY_CATEGORY: Record<BookCategory, string[]> = {
     'Jaringan Komputer Lanjut',
     'Kriptografi & Keamanan Siber',
     'Desain Pola Pemrograman',
-    'Pengembangan Aplikasi Web Modern',
     'Sistem Operasi & Kernel',
-    'Pembelajaran Mesin Terapan',
   ],
   'Sains & Matematika': [
+    'Geometri Analitik & Ruang',
+    'Geografi Regional & Spasial',
+    'Ilmu Kebumian & Geologi',
+    'Pertanian Modern & Agroteknologi',
     'Kalkulus Multivariabel Terapan',
     'Aljabar Linear & Matriks',
     'Matematika Diskrit Komputasional',
     'Fisika Kuantum Modern',
     'Statistika & Probabilitas Lanjut',
-    'Kimia Organik Universitas',
     'Biologi Molekuler Sel',
-    'Astronomi & Astrofisika',
     'Metode Numerik Rekayasa',
     'Teori Graf & Kombinatorika',
-    'Termodinamika Teknik',
   ],
   'Sastra & Fiksi': [
     'Jejak Langkah di Khatulistiwa',
@@ -63,6 +64,7 @@ const TITLE_PREFIXES_BY_CATEGORY: Record<BookCategory, string[]> = {
     'Seribu Aksara dalam Sunyi',
   ],
   'Sejarah & Sosial': [
+    'Geografi Sosial & Demografi',
     'Sejarah Peradaban Maritim',
     'Sosiologi Masyarakat Digital',
     'Antropologi Budaya Nusantara',
@@ -71,11 +73,11 @@ const TITLE_PREFIXES_BY_CATEGORY: Record<BookCategory, string[]> = {
     'Hukum Tata Negara Modern',
     'Dinamika Politik Kontemporer',
     'Arsip Kolonial & Kemerdekaan',
-    'Demografi & Pembangunan Kota',
     'Sejarah Pemikiran Pendidikan',
     'Psikologi Sosial Terapan',
   ],
   'Bisnis & Ekonomi': [
+    'Ekonomi Pertanian & Agribisnis',
     'Ekonomi Makro Nusantara',
     'Manajemen Keuangan Korporat',
     'Strategi Transformasi Digital',
@@ -85,7 +87,6 @@ const TITLE_PREFIXES_BY_CATEGORY: Record<BookCategory, string[]> = {
     'Manajemen Rantai Pasok Global',
     'Analisis Investasi & Portofolio',
     'Pemasaran Strategis Era Data',
-    'Ekonomi Syariah & Perbankan',
     'Kepemimpinan Organisasi Modern',
   ],
 };
@@ -176,26 +177,105 @@ function createSeededRng(seed: number): () => number {
   };
 }
 
-function getRackLetterForCategory(category: BookCategory): string {
-  switch (category) {
-    case 'Teknologi & Komputer':
-      return 'A';
-    case 'Sains & Matematika':
-      return 'B';
-    case 'Sastra & Fiksi':
-      return 'C';
-    case 'Sejarah & Sosial':
-      return 'D';
-    case 'Bisnis & Ekonomi':
-      return 'E';
+const RACK_LABELS_BY_CATEGORY: Record<BookCategory, string[]> = {
+  'Teknologi & Komputer': [
+    'Rak A1 - Teknologi',
+    'Rak A2 - Teknologi',
+    'Rak A3 - Komputer',
+    'Rak A4 - Rekayasa',
+  ],
+  'Sains & Matematika': [
+    'Rak B1 - Pertanian',
+    'Rak B2 - Pertanian',
+    'Rak C1 - Kebumian',
+    'Rak C3 - Kebumian',
+    'Rak D1 - Matematika',
+    'Rak D2 - Matematika',
+    'Rak E1 - Sains',
+    'Rak E2 - Sains',
+  ],
+  'Sastra & Fiksi': [
+    'Rak F1 - Umum',
+    'Rak F2 - Sastra',
+    'Rak F3 - Fiksi',
+  ],
+  'Sejarah & Sosial': [
+    'Rak G1 - Sejarah',
+    'Rak G2 - Sosial',
+    'Rak F4 - Umum',
+  ],
+  'Bisnis & Ekonomi': [
+    'Rak H1 - Ekonomi',
+    'Rak H2 - Bisnis',
+    'Rak B3 - Agribisnis',
+  ],
+};
+
+function getVariedRackLocation(
+  category: BookCategory,
+  titlePrefix: string,
+  index: number,
+): string {
+  const lower = titlePrefix.toLowerCase();
+  if (lower.includes('pertanian') || lower.includes('agribisnis')) {
+    const slot = (index % 3) + 1;
+    return `Rak B${slot} - Pertanian`;
   }
+  if (lower.includes('kebumian') || lower.includes('geografi')) {
+    const slot = (index % 3) + 1;
+    return `Rak C${slot} - Kebumian`;
+  }
+  if (
+    lower.includes('geometri') ||
+    lower.includes('kalkulus') ||
+    lower.includes('aljabar') ||
+    lower.includes('matematika') ||
+    lower.includes('statistika') ||
+    lower.includes('graf')
+  ) {
+    const slot = (index % 3) + 1;
+    return `Rak D${slot} - Matematika`;
+  }
+  const pool = RACK_LABELS_BY_CATEGORY[category];
+  return pool[index % pool.length];
 }
 
 /**
- * Generates `count` (1.000, 5.000, 10.000, etc.) realistic Book records
- * with 100% unique IDs, ISBN-13s ("978-602-XXXXXXX"), and titles in < 100ms.
+ * Formats a 1-based book number into a unique 13-digit ISBN with format 978-602-XXXX-XX-X.
+ * Note: BK-0001 uses "978-602-0000001" compatible format or "978-602-0000-00-1" (13 digits normalized).
  */
-export function generateBooks(count: number, seed: number = 20261122): Book[] {
+function buildIsbn13(num: number): string {
+  const digits7 = String(num).padStart(7, '0');
+  const part1 = digits7.slice(0, 4);
+  const part2 = digits7.slice(4, 6);
+  const part3 = digits7.slice(6, 7);
+  return `978-602-${part1}-${part2}-${part3}`;
+}
+
+/**
+ * Performs an in-place Fisher-Yates shuffle on a copy of `books` using the provided seed.
+ */
+export function shuffleBooksArray(
+  books: readonly Book[],
+  seed: number = Date.now(),
+): Book[] {
+  const rng = createSeededRng(seed);
+  const copy = books.map((b) => ({ ...b }));
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy;
+}
+
+/**
+ * Generates `count` (10.000 default) realistic Book records
+ * with 100% unique IDs, ISBN-13s ("978-602-XXXX-XX-X"), and titles,
+ * deliberately shuffled via Fisher-Yates so initial order is genuinely random.
+ */
+export function generateBooks(count: number, seed: number = 20261126): Book[] {
   const rng = createSeededRng(seed);
   const books: Book[] = new Array(count);
   const baseTimestamp = Date.UTC(2026, 0, 1, 8, 0, 0);
@@ -203,37 +283,35 @@ export function generateBooks(count: number, seed: number = 20261122): Book[] {
   for (let i = 0; i < count; i += 1) {
     const num = i + 1;
     const serial4 = String(num).padStart(4, '0');
-    const isbnSuffix = String(num).padStart(7, '0');
     const category = BOOK_CATEGORIES[i % BOOK_CATEGORIES.length];
     const prefixes = TITLE_PREFIXES_BY_CATEGORY[category];
-    const prefix = prefixes[Math.floor(rng() * prefixes.length)];
+    const prefix = prefixes[i % prefixes.length];
     const qualifier = TOPIC_QUALIFIERS[Math.floor(rng() * TOPIC_QUALIFIERS.length)];
     const author = AUTHORS[Math.floor(rng() * AUTHORS.length)];
     const publisher = PUBLISHERS[Math.floor(rng() * PUBLISHERS.length)];
-    const year = 1995 + Math.floor(rng() * 32); // 1995..2026
-    const stokTotal = 2 + Math.floor(rng() * 14); // 2..15 (ensures headroom for initial loans)
-    const rackLetter = getRackLetterForCategory(category);
-    const rackSlot = String((Math.floor(i / 5) % 20) + 1).padStart(2, '0');
+    const year = 2010 + Math.floor(rng() * 17); // 2010..2026
+    const stokTotal = 2 + Math.floor(rng() * 14); // 2..15
+    const kodeRak = getVariedRackLocation(category, prefix, i);
     const color = COVER_COLOR_PALETTE[i % COVER_COLOR_PALETTE.length].hex;
 
     books[i] = {
       id: `BK-${serial4}`,
-      isbn: `978-602-${isbnSuffix}`,
-      judul: `${prefix}: ${qualifier} (Vol. ${serial4})`,
+      isbn: buildIsbn13(num),
+      judul: `${prefix}: ${qualifier} (Edisi ${serial4})`,
       penulis: author,
       penerbit: publisher,
       tahunTerbit: year,
       kategori: category,
-      kodeRak: `RAK-${rackLetter}${rackSlot}`,
+      kodeRak,
       stokTotal,
       stokTersedia: stokTotal,
       coverColor: color,
-      deskripsi: `Buku rujukan ${category.toLowerCase()} seri ${serial4} tentang ${prefix.toLowerCase()} dengan pendekatan ${qualifier.toLowerCase()}.`,
+      deskripsi: `Buku koleksi ${category.toLowerCase()} seri ${serial4} membahas ${prefix.toLowerCase()} dengan fokus ${qualifier.toLowerCase()}.`,
       createdAt: new Date(baseTimestamp + i * 60000).toISOString(),
     };
   }
 
-  // Deterministic Fisher-Yates shuffle so initial catalog & random benchmark start unsorted
+  // Deterministic Fisher-Yates shuffle so initial 10.000 books are genuinely unsorted
   for (let i = books.length - 1; i > 0; i -= 1) {
     const j = Math.floor(rng() * (i + 1));
     const tmp = books[i];
@@ -258,6 +336,10 @@ function compareFieldAsc(a: Book, b: Book, field: SortField): number {
     const av = a.isbn.toLowerCase();
     const bv = b.isbn.toLowerCase();
     cmp = av < bv ? -1 : av > bv ? 1 : 0;
+  } else if (field === 'kodeRak') {
+    const av = a.kodeRak.toLowerCase();
+    const bv = b.kodeRak.toLowerCase();
+    cmp = av < bv ? -1 : av > bv ? 1 : 0;
   } else if (field === 'tahunTerbit') {
     cmp = a.tahunTerbit - b.tahunTerbit;
   } else {
@@ -270,8 +352,8 @@ function compareFieldAsc(a: Book, b: Book, field: SortField): number {
 /**
  * Prepares a copy of `books` according to the requested benchmark data condition:
  * - 'random': Fisher-Yates shuffled (Average Case)
- * - 'reversed': Sorted descending by `field` (Worst Case for ascending Insertion Sort)
- * - 'nearly_sorted': Sorted ascending with ~2% local swaps (Best Case for Insertion Sort)
+ * - 'reversed': Sorted descending by `field` (Worst Case for ascending Insertion/Bubble Sort)
+ * - 'nearly_sorted': Sorted ascending with ~2% local swaps (Best Case for Insertion/Bubble Sort)
  */
 export function prepareDatasetByCondition(
   books: readonly Book[],
@@ -292,7 +374,6 @@ export function prepareDatasetByCondition(
     return copy;
   }
 
-  // Merge sort in pure JS without Array.prototype.sort()
   const mergeSortAsc = (arr: Book[]): Book[] => {
     if (arr.length <= 1) return arr;
     const mid = Math.floor(arr.length / 2);
@@ -324,7 +405,6 @@ export function prepareDatasetByCondition(
     return reversed;
   }
 
-  // 'nearly_sorted': ~2% small adjacent swaps
   const swapCount = Math.max(1, Math.floor(sortedAsc.length * 0.02));
   for (let s = 0; s < swapCount; s += 1) {
     const idx = Math.floor(rng() * Math.max(1, sortedAsc.length - 1));

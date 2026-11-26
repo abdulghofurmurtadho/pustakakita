@@ -9,15 +9,19 @@ import {
   Upload,
 } from 'lucide-react';
 import { Modal } from '../components/common/Modal';
-import { useLibrary } from '../context/LibraryContext';
+import {
+  BOOKS_STORAGE_KEY,
+  LOANS_STORAGE_KEY,
+  useLibrary,
+} from '../context/LibraryContext';
 import { useToast } from '../context/ToastContext';
 import { BenchmarkScale } from '../types';
 import { getTodayDateString } from '../utils/dateUtils';
 
 const PRESETS: { count: BenchmarkScale; label: string; desc: string }[] = [
-  { count: 1000, label: 'Muat 1.000 Buku (Default)', desc: 'Skala minimal standar' },
+  { count: 1000, label: 'Muat 1.000 Buku', desc: 'Skala minimal standar' },
   { count: 5000, label: 'Muat 5.000 Buku', desc: 'Skala menengah' },
-  { count: 10000, label: 'Muat 10.000 Buku', desc: 'Skala maksimal akademik' },
+  { count: 10000, label: 'Muat 10.000 Buku (Default)', desc: 'Skala maksimal bawaan' },
 ];
 
 export function SettingsView() {
@@ -89,7 +93,7 @@ export function SettingsView() {
     setIsResetModalOpen(false);
     setRestoreFeedback(null);
     addToast(
-      'Data berhasil dikembalikan ke 1.000 buku dan 3 transaksi bawaan.',
+      'Data berhasil dikembalikan ke 10.000 buku dan 3 transaksi bawaan.',
       'success',
     );
   };
@@ -117,7 +121,7 @@ export function SettingsView() {
             {books.length.toLocaleString('id-ID')} Judul Buku
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Kunci penyimpanan: <code className="font-mono">pustakakita_books</code>
+            Kunci penyimpanan: <code className="font-mono">{BOOKS_STORAGE_KEY}</code>
           </p>
         </div>
 
@@ -129,7 +133,7 @@ export function SettingsView() {
             {loans.length} Transaksi
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Kunci penyimpanan: <code className="font-mono">pustakakita_loans</code>
+            Kunci penyimpanan: <code className="font-mono">{LOANS_STORAGE_KEY}</code>
           </p>
         </div>
       </div>
@@ -306,10 +310,10 @@ export function SettingsView() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-serif text-base font-bold text-rose-950">
-              Reset ke 1.000 Buku Bawaan (Factory Reset)
+              Reset ke 10.000 Buku Bawaan (Factory Reset)
             </h2>
             <p className="mt-1 text-xs text-rose-800">
-              Menghapus perubahan lokal dan memulihkan dataset awal (1.000 buku unik dan 3
+              Menghapus perubahan lokal dan memulihkan dataset awal (10.000 buku unik dan 3
               catatan sirkulasi awal).
             </p>
           </div>
@@ -335,7 +339,7 @@ export function SettingsView() {
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
             <p className="leading-relaxed">
-              Apakah Anda yakin ingin mengembalikan seluruh koleksi buku (1.000 judul) dan
+              Apakah Anda yakin ingin mengembalikan seluruh koleksi buku (10.000 judul) dan
               sirkulasi (3 transaksi) ke kondisi bawaan pabrik? Disarankan untuk mengunduh
               backup JSON terlebih dahulu.
             </p>

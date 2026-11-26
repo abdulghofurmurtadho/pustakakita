@@ -1,4 +1,4 @@
-import { LayoutGrid, List, SlidersHorizontal } from 'lucide-react';
+import { ArrowUpDown, LayoutGrid, List, Loader2, SlidersHorizontal } from 'lucide-react';
 import { BOOK_CATEGORIES } from '../../data/initialSeed';
 import { BookCategory, SortAlgorithmType, SortField, SortOrder } from '../../types';
 
@@ -6,6 +6,7 @@ export type AvailabilityFilter = 'Semua' | 'Tersedia' | 'Habis';
 export type CatalogSortOption =
   | 'judul-asc'
   | 'tahun-desc'
+  | 'isbn-asc'
   | 'stok-desc'
   | 'penulis-asc';
 export type CatalogViewMode = 'grid' | 'table';
@@ -19,10 +20,10 @@ interface FilterPanelProps {
   onSortOptionChange: (option: CatalogSortOption) => void;
   sortAlgorithm: SortAlgorithmType;
   onSortAlgorithmChange: (alg: SortAlgorithmType) => void;
+  onTriggerSort: () => void;
+  isSorting: boolean;
   viewMode: CatalogViewMode;
   onViewModeChange: (mode: CatalogViewMode) => void;
-  sortTimeMs: number;
-  sortComparisons: number;
 }
 
 export function resolveSortParams(option: CatalogSortOption): {
@@ -32,6 +33,8 @@ export function resolveSortParams(option: CatalogSortOption): {
   switch (option) {
     case 'tahun-desc':
       return { field: 'tahunTerbit', order: 'desc' };
+    case 'isbn-asc':
+      return { field: 'isbn', order: 'asc' };
     case 'stok-desc':
       return { field: 'stokTersedia', order: 'desc' };
     case 'penulis-asc':
@@ -51,10 +54,10 @@ export function FilterPanel({
   onSortOptionChange,
   sortAlgorithm,
   onSortAlgorithmChange,
+  onTriggerSort,
+  isSorting,
   viewMode,
   onViewModeChange,
-  sortTimeMs,
-  sortComparisons,
 }: FilterPanelProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-parchment-200 bg-white px-4 py-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
@@ -98,33 +101,54 @@ export function FilterPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-2.5 xl:justify-end">
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="Algoritma Sort"
-            value={sortAlgorithm}
-            onChange={(e) => onSortAlgorithmChange(e.target.value as SortAlgorithmType)}
-            className="rounded-lg border border-slate-200 bg-parchment-50/70 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 focus:border-emerald-900 focus:outline-none"
-          >
-            <option value="quick">Quick Sort O(n log n)</option>
-            <option value="merge">Merge Sort O(n log n)</option>
-            <option value="insertion">Insertion Sort O(n²)</option>
-          </select>
+          <div className="flex items-center gap-1.5">
+            <label
+              htmlFor="catalog-sort-algo"
+              className="text-[11px] font-semibold text-slate-500"
+            >
+              Algoritma Sort:
+            </label>
+            <select
+              id="catalog-sort-algo"
+              aria-label="Pilih Algoritma Sorting"
+              value={sortAlgorithm}
+              onChange={(e) => onSortAlgorithmChange(e.target.value as SortAlgorithmType)}
+              className="rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-bold text-indigo-950 focus:border-indigo-900 focus:outline-none"
+            >
+              <option value="quick">Quick Sort — O(n log n)</option>
+              <option value="merge">Merge Sort — O(n log n)</option>
+              <option value="bubble">Bubble Sort — O(n²)</option>
+              <option value="insertion">Insertion Sort — O(n²)</option>
+            </select>
+          </div>
 
           <select
             id="catalog-sort"
-            aria-label="Urutan Buku"
+            aria-label="Urutkan Berdasarkan"
             value={sortOption}
             onChange={(e) => onSortOptionChange(e.target.value as CatalogSortOption)}
             className="rounded-lg border border-slate-200 bg-parchment-50/70 px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-emerald-900 focus:outline-none"
           >
-            <option value="judul-asc">Judul (A–Z)</option>
+            <option value="judul-asc">Judul Buku (A–Z)</option>
             <option value="tahun-desc">Tahun Terbit (Terbaru)</option>
+            <option value="isbn-asc">Kode ISBN (A–Z)</option>
             <option value="stok-desc">Stok Terbanyak</option>
             <option value="penulis-asc">Penulis (A–Z)</option>
           </select>
 
-          <span className="rounded-md bg-parchment-100 px-2 py-1 font-mono text-[11px] text-slate-600">
-            {sortTimeMs.toFixed(2)} ms · {sortComparisons.toLocaleString('id-ID')} cmp
-          </span>
+          <button
+            type="button"
+            disabled={isSorting}
+            onClick={onTriggerSort}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"
+          >
+            {isSorting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-300" />
+            ) : (
+              <ArrowUpDown className="h-3.5 w-3.5 text-amber-300" />
+            )}
+            <span>{isSorting ? 'Mengurutkan...' : 'Urutkan'}</span>
+          </button>
         </div>
 
         <div className="inline-flex rounded-lg border border-slate-200 bg-parchment-50 p-0.5">

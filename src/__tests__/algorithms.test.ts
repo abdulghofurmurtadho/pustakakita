@@ -10,17 +10,22 @@ import {
   binarySearch,
   binarySearchBooks,
   binarySearchNumber,
+  jumpSearchBooks,
   linearSearch,
+  runDetailedSearch,
 } from '../algorithms/searching';
 import {
+  bubbleSort,
   compareBooks,
   insertionSort,
   mergeSort,
   quickSort,
+  runDetailedSort,
 } from '../algorithms/sorting';
 import { generateBooks, prepareDatasetByCondition } from '../data/bookGenerator';
 import { INITIAL_BOOKS } from '../data/initialSeed';
 import { SortField, SortOrder } from '../types';
+import { getCriterionInputConfig } from '../utils/formatters';
 
 describe('Generator Dataset Besar 1.000 – 10.000 Buku (AC-02)', () => {
   it('generateBooks membangkitkan 1.000, 5.000, dan 10.000 buku dengan ID, ISBN, dan Judul 100% unik', () => {
@@ -63,13 +68,16 @@ describe('Keamanan & Akurasi Algoritma Sorting pada Skala 1.000 & 10.000 Data (A
         const qRes = quickSort(sample1k, field, order);
         const mRes = mergeSort(sample1k, field, order);
         const iRes = insertionSort(sample1k, field, order);
+        const bRes = bubbleSort(sample1k, field, order);
 
         expect(qRes.result.map((b) => b.id)).toEqual(expectedIds);
         expect(mRes.result.map((b) => b.id)).toEqual(expectedIds);
         expect(iRes.result.map((b) => b.id)).toEqual(expectedIds);
+        expect(bRes.result.map((b) => b.id)).toEqual(expectedIds);
         expect(qRes.comparisons).toBeGreaterThan(0);
         expect(mRes.comparisons).toBeGreaterThan(0);
         expect(iRes.comparisons).toBeGreaterThan(0);
+        expect(bRes.comparisons).toBeGreaterThan(0);
       }
     }
   });
@@ -104,20 +112,23 @@ describe('Keamanan & Akurasi Algoritma Sorting pada Skala 1.000 & 10.000 Data (A
     );
   });
 
-  it('AC-04: insertionSort pada 10.000 data acak akurat dan jauh lebih banyak perbandingan daripada quickSort/mergeSort', () => {
+  it('AC-04: insertionSort & bubbleSort pada 10.000 data acak akurat dan jauh lebih banyak perbandingan daripada quickSort/mergeSort', () => {
     const books10k = generateBooks(10000);
     const metrics = runSortBenchmark(books10k, 'judul', 'asc', 'random');
-    expect(metrics).toHaveLength(3);
+    expect(metrics).toHaveLength(4);
 
     const quick = metrics[0];
     const merge = metrics[1];
     const insertion = metrics[2];
+    const bubble = metrics[3];
 
     expect(quick.itemCount).toBe(10000);
     expect(merge.itemCount).toBe(10000);
     expect(insertion.itemCount).toBe(10000);
+    expect(bubble.itemCount).toBe(10000);
     // O(n^2) vs O(n log n) empirical separation
     expect(insertion.comparisonsCount).toBeGreaterThan(quick.comparisonsCount * 10);
+    expect(bubble.comparisonsCount).toBeGreaterThan(quick.comparisonsCount * 10);
     expect(insertion.comparisonsCount).toBeGreaterThan(merge.comparisonsCount * 10);
   });
 });
@@ -146,7 +157,7 @@ describe('Algoritma Searching pada 1.000 dan 10.000 Data (AC-04 & AC-05)', () =>
     expect(binMiss.item).toBeNull();
   });
 
-  it('binarySearchNumber dan binarySearchBooks bekerja pada array numerik dan seed 1.000 buku', () => {
+  it('binarySearchNumber, jumpSearchBooks, dan binarySearchBooks bekerja akurat pada array numerik dan seed 10.000 buku', () => {
     const arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91];
     expect(binarySearchNumber(arr, 23).foundIndex).toBe(5);
     expect(binarySearchNumber(arr, 40).foundIndex).toBe(-1);
@@ -155,7 +166,106 @@ describe('Algoritma Searching pada 1.000 dan 10.000 Data (AC-04 & AC-05)', () =>
     const bookSearchHit = binarySearchBooks(INITIAL_BOOKS, target.judul, 'judul');
     expect(bookSearchHit.foundIndex).toBeGreaterThanOrEqual(0);
     expect(bookSearchHit.matchedBooks.some((b) => b.id === target.id)).toBe(true);
-    expect(bookSearchHit.comparisonsCount).toBeLessThanOrEqual(12);
+    expect(bookSearchHit.comparisonsCount).toBeLessThanOrEqual(15);
+
+    // Jump Search O(√n) test on 10,000 books
+    const jumpHit = jumpSearchBooks(
+      INITIAL_BOOKS,
+      target.judul,
+      'judul',
+      bookSearchHit.sortedOrderUsed,
+    );
+    expect(jumpHit.foundIndex).toBe(bookSearchHit.foundIndex);
+    expect(jumpHit.matchedBooks.some((b) => b.id === target.id)).toBe(true);
+    expect(jumpHit.jumpStepSize).toBe(100); // floor(sqrt(10000)) = 100
+    expect(jumpHit.comparisonsCount).toBeLessThanOrEqual(210);
+    expect(jumpHit.steps.length).toBeGreaterThan(0);
+
+    const jumpMiss = jumpSearchBooks(
+      INITIAL_BOOKS,
+      'ZZZ-BUKU-TIDAK-PERNAH-ADA',
+      'judul',
+      bookSearchHit.sortedOrderUsed,
+    );
+    expect(jumpMiss.foundIndex).toBe(-1);
+    expect(jumpMiss.matchedBooks).toHaveLength(0);
+  });
+
+  it('runDetailedSort dan runDetailedSearch menghasilkan laporan 4 tahap + Head-to-Head perbandingan efisiensi & filter kriteria dinamis', () => {
+    const sortRep50 = runDetailedSort(
+      INITIAL_BOOKS,
+      50,
+      'bubble',
+      'judul',
+      'asc',
+      'Geometri',
+    );
+    expect(sortRep50.totalSliceCount).toBe(50);
+    expect(sortRep50.headToHead).toHaveLength(4);
+    expect(sortRep50.headToHead.some((h) => h.isWinner)).toBe(true);
+    expect(sortRep50.winnerSummary).toContain('paling unggul & efisien');
+    expect(sortRep50.narrativeAnalysis).toContain('Data Kecil (50 Buku)');
+
+    const sampleTarget = INITIAL_BOOKS[15].isbn;
+    const searchRep1000 = runDetailedSearch(
+      INITIAL_BOOKS,
+      1000,
+      'jump',
+      'isbn',
+      sampleTarget,
+    );
+    expect(searchRep1000.itemCount).toBe(1000);
+    expect(searchRep1000.requiresPreSort).toBe(true);
+    expect(searchRep1000.foundIndex).toBeGreaterThanOrEqual(0);
+    expect(searchRep1000.foundBook?.isbn).toBe(sampleTarget);
+    expect(searchRep1000.steps.length).toBeGreaterThan(0);
+    expect(searchRep1000.headToHead).toHaveLength(3);
+    expect(searchRep1000.headToHead.some((h) => h.isLeastSteps)).toBe(true);
+    expect(searchRep1000.winnerSummary).toContain('paling unggul & efisien');
+
+    // Test searching by tahunTerbit criterion
+    const targetYear = String(INITIAL_BOOKS[10].tahunTerbit);
+    const searchByYear = runDetailedSearch(
+      INITIAL_BOOKS,
+      1000,
+      'binary',
+      'tahunTerbit',
+      targetYear,
+    );
+    expect(searchByYear.foundIndex).toBeGreaterThanOrEqual(0);
+    expect(searchByYear.matchedBooks.length).toBeGreaterThan(0);
+
+    // Test sorting and searching by kodeRak (Lokasi Rak) criterion
+    const sortByRack = runDetailedSort(
+      INITIAL_BOOKS,
+      50,
+      'quick',
+      'kodeRak',
+      'asc',
+      'Rak A1',
+    );
+    expect(sortByRack.totalSliceCount).toBe(50);
+    expect(sortByRack.sortedBooks).toHaveLength(50);
+
+    const targetRack = INITIAL_BOOKS[0].kodeRak;
+    const searchByRack = runDetailedSearch(
+      INITIAL_BOOKS,
+      1000,
+      'linear',
+      'kodeRak',
+      targetRack,
+    );
+    expect(searchByRack.foundIndex).toBeGreaterThanOrEqual(0);
+    expect(searchByRack.matchedBooks.length).toBeGreaterThan(0);
+
+    // Test dynamic criterion input sanitizer
+    expect(getCriterionInputConfig('isbn').sanitize('978-602-ABC!01')).toBe(
+      '978-602-01',
+    );
+    expect(getCriterionInputConfig('tahunTerbit').sanitize('2024xyz99')).toBe(
+      '2024',
+    );
+    expect(getCriterionInputConfig('kodeRak').label).toContain('Lokasi Rak');
   });
 
   it('AC-05: Multi-Scale Benchmark (1.000 -> 5.000 -> 10.000) & Ekspor CSV menghasilkan laporan valid', () => {

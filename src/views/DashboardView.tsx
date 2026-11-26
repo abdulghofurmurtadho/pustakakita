@@ -1,11 +1,13 @@
+import { useMemo } from 'react';
 import {
-  AlertTriangle,
-  ArrowLeftRight,
   ArrowRight,
-  BookCopy,
+  BarChart3,
   BookOpen,
-  Gauge,
+  Calendar,
+  FolderKanban,
   Layers,
+  MapPin,
+  PackageCheck,
 } from 'lucide-react';
 import {
   Bar,
@@ -20,112 +22,263 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Badge } from '../components/common/Badge';
 import { useLibrary } from '../context/LibraryContext';
-import { BOOK_CATEGORIES } from '../data/initialSeed';
-import { readLastBenchmarkSummary } from '../hooks/useBenchmark';
-import { LoanRecord, ViewRoute } from '../types';
-import {
-  addDays,
-  getEffectiveLoanFine,
-  getTodayDateString,
-  isLoanOverdue,
-} from '../utils/dateUtils';
-import { formatDateIndo, formatRupiah } from '../utils/formatters';
+import { Book, ViewRoute } from '../types';
 
 interface DashboardViewProps {
   onNavigate: (route: ViewRoute) => void;
-  onQuickBorrow: () => void;
-  onRequestReturn: (loan: LoanRecord) => void;
 }
 
-const PIE_COLORS = ['#064E3B', '#1E3A8A', '#D97706', '#991B1B', '#6B21A8'];
+export type RackGroupKey =
+  | 'Teknologi'
+  | 'Pertanian'
+  | 'Kebumian'
+  | 'Matematika'
+  | 'Sains'
+  | 'Umum';
 
-export function DashboardView({
-  onNavigate,
-  onQuickBorrow,
-  onRequestReturn,
-}: DashboardViewProps) {
-  const { books, loans } = useLibrary();
-  const today = getTodayDateString();
-  const lastBenchmark = readLastBenchmarkSummary();
+const RACK_GROUP_CONFIG: {
+  key: RackGroupKey;
+  label: string;
+  rackRange: string;
+  color: string;
+}[] = [
+  {
+    key: 'Teknologi',
+    label: 'Teknologi (Rak A)',
+    rackRange: 'Rak A1 – A4 (Teknologi & Komputer)',
+    color: '#064E3B',
+  },
+  {
+    key: 'Pertanian',
+    label: 'Pertanian (Rak B)',
+    rackRange: 'Rak B1 – B3 (Pertanian & Agribisnis)',
+    color: '#15803D',
+  },
+  {
+    key: 'Kebumian',
+    label: 'Kebumian (Rak C)',
+    rackRange: 'Rak C1 – C3 (Kebumian & Geografi)',
+    color: '#0284C7',
+  },
+  {
+    key: 'Matematika',
+    label: 'Matematika (Rak D)',
+    rackRange: 'Rak D1 – D3 (Matematika & Geometri)',
+    color: '#1E3A8A',
+  },
+  {
+    key: 'Sains',
+    label: 'Sains (Rak E)',
+    rackRange: 'Rak E1 – E2 (Sains Alam & Fisika)',
+    color: '#D97706',
+  },
+  {
+    key: 'Umum',
+    label: 'Umum (Rak F–H)',
+    rackRange: 'Rak F – H (Umum, Sastra, Sosial & Ekonomi)',
+    color: '#7C3AED',
+  },
+];
 
-  const totalJudul = books.length;
-  const totalEksemplar = books.reduce((sum, b) => sum + b.stokTotal, 0);
-  const totalTersedia = books.reduce((sum, b) => sum + b.stokTersedia, 0);
-  const activeLoans = loans.filter((l) => l.status === 'Dipinjam');
-  const overdueLoans = activeLoans.filter((l) => isLoanOverdue(l, today));
-  const totalPotentialFine = activeLoans.reduce(
-    (sum, l) => sum + getEffectiveLoanFine(l, today),
-    0,
-  );
+export function classifyBookRackGroup(book: Book): RackGroupKey {
+  const rakLower = (book.kodeRak || '').toLowerCase();
+  const titleLower = (book.judul || '').toLowerCase();
 
-  // Category distribution for Donut Chart
-  const categoryData = BOOK_CATEGORIES.map((category) => {
-    const count = books.filter((b) => b.kategori === category).length;
+  if (
+    rakLower.includes('teknologi') ||
+    rakLower.includes('komputer') ||
+    rakLower.includes('rekayasa') ||
+    rakLower.startsWith('rak a') ||
+    rakLower.startsWith('rak-a')
+  ) {
+    return 'Teknologi';
+  }
+  if (
+    rakLower.includes('pertanian') ||
+    rakLower.includes('agribisnis') ||
+    rakLower.startsWith('rak b') ||
+    rakLower.startsWith('rak-b') ||
+    titleLower.includes('pertanian')
+  ) {
+    return 'Pertanian';
+  }
+  if (
+    rakLower.includes('kebumian') ||
+    rakLower.includes('geografi') ||
+    rakLower.startsWith('rak c') ||
+    rakLower.startsWith('rak-c') ||
+    titleLower.includes('kebumian') ||
+    titleLower.includes('geografi')
+  ) {
+    return 'Kebumian';
+  }
+  if (
+    rakLower.includes('matematika') ||
+    rakLower.startsWith('rak d') ||
+    rakLower.startsWith('rak-d') ||
+    titleLower.includes('geometri') ||
+    titleLower.includes('matematika') ||
+    titleLower.includes('kalkulus') ||
+    titleLower.includes('aljabar')
+  ) {
+    return 'Matematika';
+  }
+  if (
+    rakLower.includes('sains') ||
+    rakLower.startsWith('rak e') ||
+    rakLower.startsWith('rak-e')
+  ) {
+    return 'Sains';
+  }
+  if (book.kategori === 'Teknologi & Komputer') {
+    return 'Teknologi';
+  }
+  if (book.kategori === 'Sains & Matematika') {
+    return 'Sains';
+  }
+  return 'Umum';
+}
+
+export function DashboardView({ onNavigate }: DashboardViewProps) {
+  const { books } = useLibrary();
+
+  const {
+    totalJudul,
+    totalEksemplar,
+    totalTersedia,
+    uniqueRackLocationsCount,
+    activeRackGroupCount,
+    latestYear,
+    latestYearCount,
+    latestBookSample,
+    rackDistributionData,
+    yearDistributionData,
+  } = useMemo(() => {
+    let eksemplar = 0;
+    let tersedia = 0;
+    let maxYear = 0;
+    let maxYearBooksCount = 0;
+    let newestBook: Book | null = null;
+
+    const uniqueRacks = new Set<string>();
+    const rackGroupCounts = new Map<RackGroupKey, number>();
+    const rackGroupStock = new Map<RackGroupKey, number>();
+    for (const cfg of RACK_GROUP_CONFIG) {
+      rackGroupCounts.set(cfg.key, 0);
+      rackGroupStock.set(cfg.key, 0);
+    }
+
+    const yearCounts = new Map<number, number>();
+    for (let y = 2010; y <= 2026; y += 1) {
+      yearCounts.set(y, 0);
+    }
+
+    for (let i = 0; i < books.length; i += 1) {
+      const b = books[i];
+      eksemplar += b.stokTotal;
+      tersedia += b.stokTersedia;
+      if (b.kodeRak) {
+        uniqueRacks.add(b.kodeRak.trim());
+      }
+
+      const groupKey = classifyBookRackGroup(b);
+      rackGroupCounts.set(groupKey, (rackGroupCounts.get(groupKey) || 0) + 1);
+      rackGroupStock.set(
+        groupKey,
+        (rackGroupStock.get(groupKey) || 0) + b.stokTotal,
+      );
+
+      if (b.tahunTerbit > maxYear) {
+        maxYear = b.tahunTerbit;
+        maxYearBooksCount = 1;
+        newestBook = b;
+      } else if (b.tahunTerbit === maxYear) {
+        maxYearBooksCount += 1;
+        if (!newestBook) {
+          newestBook = b;
+        }
+      }
+
+      yearCounts.set(b.tahunTerbit, (yearCounts.get(b.tahunTerbit) || 0) + 1);
+    }
+
+    const total = books.length;
+    const rackDist = RACK_GROUP_CONFIG.map((cfg) => {
+      const count = rackGroupCounts.get(cfg.key) || 0;
+      const stock = rackGroupStock.get(cfg.key) || 0;
+      const percentage = total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0;
+      return {
+        key: cfg.key,
+        name: cfg.key,
+        fullLabel: cfg.label,
+        rackRange: cfg.rackRange,
+        value: count,
+        stock,
+        percentage,
+        color: cfg.color,
+      };
+    });
+
+    const activeGroups = rackDist.filter((item) => item.value > 0).length;
+
+    const sortedYears = Array.from(yearCounts.keys()).sort((a, b) => a - b);
+    const yearDist = sortedYears.map((yr) => ({
+      tahun: String(yr),
+      yearNum: yr,
+      jumlah: yearCounts.get(yr) || 0,
+    }));
+
     return {
-      name: category,
-      value: count,
+      totalJudul: total,
+      totalEksemplar: eksemplar,
+      totalTersedia: tersedia,
+      uniqueRackLocationsCount: uniqueRacks.size,
+      activeRackGroupCount: activeGroups,
+      latestYear: maxYear || 2026,
+      latestYearCount: maxYearBooksCount,
+      latestBookSample: newestBook,
+      rackDistributionData: rackDist,
+      yearDistributionData: yearDist,
     };
-  }).filter((item) => item.value > 0);
-
-  // Last 7 days loan trend for Bar Chart
-  const trendData = Array.from({ length: 7 }, (_, idx) => {
-    const offset = idx - 6;
-    const dateStr = addDays(today, offset);
-    const shortLabel = formatDateIndo(dateStr).split(' ').slice(0, 2).join(' ');
-    const peminjaman = loans.filter((l) => l.tanggalPinjam === dateStr).length;
-    const pengembalian = loans.filter(
-      (l) => l.tanggalDikembalikan === dateStr,
-    ).length;
-    return {
-      tanggal: shortLabel,
-      peminjaman,
-      pengembalian,
-    };
-  });
-
-  // 5 most recent loan records
-  const recentLoans = [...loans]
-    .sort((a, b) => (b.tanggalPinjam > a.tanggalPinjam ? 1 : b.tanggalPinjam < a.tanggalPinjam ? -1 : b.id > a.id ? 1 : -1))
-    .slice(0, 5);
+  }, [books]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      {/* Header Banner */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200/80 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-amber-700">
-            Ringkasan Perpustakaan · Skala Akademik
+            Menu 1 · Single Source of Truth ({totalJudul.toLocaleString('id-ID')} Buku Aktif)
           </p>
           <h1 className="mt-1 font-serif text-2xl font-bold text-slate-900">
-            Dashboard Operasional PustakaKita
+            Dashboard Ringkasan Koleksi PustakaKita
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
-            Pantau katalog berskala besar, sirkulasi aktif, denda keterlambatan, dan hasil
-            benchmark algoritma struktur data.
+          <p className="mt-1 text-xs text-slate-600">
+            Seluruh metrik KPI, diagram lingkaran kategori lokasi rak, dan grafik sebaran tahun
+            terbit dihitung secara dinamis dari sumber data tunggal inventaris.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onNavigate('/benchmark')}
-            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-parchment-50"
+            onClick={() => onNavigate('/inventaris')}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-950"
           >
-            Lab Algoritma
-          </button>
-          <button
-            type="button"
-            onClick={onQuickBorrow}
-            className="rounded-lg bg-emerald-900 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-950"
-          >
-            + Peminjaman Baru
+            <PackageCheck className="h-4 w-4 text-amber-300" />
+            <span>Buka Inventaris &amp; Uji Algoritma</span>
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* KPI Metrics Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* 4 Main Dynamic KPI Cards */}
+      <section
+        aria-label="Kartu KPI Ringkasan Koleksi"
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+      >
+        {/* KPI 1: Total Judul Buku */}
         <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Total Judul Buku</span>
@@ -133,319 +286,268 @@ export function DashboardView({
               <BookOpen className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-3 font-mono text-3xl font-bold text-slate-900">
+          <p
+            data-testid="kpi-total-judul"
+            className="mt-3 font-mono text-3xl font-bold text-slate-900"
+          >
             {totalJudul.toLocaleString('id-ID')}
           </p>
           <p className="mt-1 text-[11px] text-slate-500">
-            Terindeks di {categoryData.length} kategori utama
+            Tersimpan acak (Fisher-Yates) di memori utama
           </p>
         </div>
 
+        {/* KPI 2: Total Stok Eksemplar */}
         <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">
-              Total Eksemplar Fisik
+              Total Stok Eksemplar
             </span>
             <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700">
               <Layers className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-3 font-mono text-3xl font-bold text-slate-900">
+          <p
+            data-testid="kpi-total-eksemplar"
+            className="mt-3 font-mono text-3xl font-bold text-slate-900"
+          >
             {totalEksemplar.toLocaleString('id-ID')}
           </p>
           <p className="mt-1 text-[11px] text-slate-500">
             <strong className="text-emerald-700">
               {totalTersedia.toLocaleString('id-ID')}
             </strong>{' '}
-            tersedia ·{' '}
-            <strong>{(totalEksemplar - totalTersedia).toLocaleString('id-ID')}</strong>{' '}
-            dipinjam
+            eksemplar tersedia siap dipinjam
           </p>
         </div>
 
-        <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Sedang Dipinjam</span>
-            <div className="rounded-lg bg-amber-50 p-2 text-amber-700">
-              <ArrowLeftRight className="h-4 w-4" />
-            </div>
-          </div>
-          <p className="mt-3 font-mono text-3xl font-bold text-slate-900">
-            {activeLoans.length}
-          </p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            {loans.filter((l) => l.status === 'Dikembalikan').length} transaksi telah
-            selesai
-          </p>
-        </div>
-
+        {/* KPI 3: Jumlah Kategori Rak */}
         <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">
-              Terlambat &amp; Estimasi Denda
+              Jumlah Kategori Rak
             </span>
-            <div
-              className={`rounded-lg p-2 ${
-                overdueLoans.length > 0
-                  ? 'bg-rose-50 text-rose-600'
-                  : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              <AlertTriangle className="h-4 w-4" />
+            <div className="rounded-lg bg-amber-50 p-2 text-amber-700">
+              <FolderKanban className="h-4 w-4" />
+            </div>
+          </div>
+          <p
+            data-testid="kpi-kategori-rak"
+            className="mt-3 font-mono text-3xl font-bold text-slate-900"
+          >
+            {activeRackGroupCount} Kategori
+          </p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Tersebar di{' '}
+            <strong className="text-slate-800">{uniqueRackLocationsCount}</strong> kode
+            lokasi rak fisik
+          </p>
+        </div>
+
+        {/* KPI 4: Buku Terbitan Terbaru */}
+        <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500">
+              Buku Terbitan Terbaru
+            </span>
+            <div className="rounded-lg bg-purple-50 p-2 text-purple-700">
+              <Calendar className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <p className="font-mono text-2xl font-bold text-rose-700">
-              {formatRupiah(totalPotentialFine)}
+            <p
+              data-testid="kpi-tahun-terbaru"
+              className="font-mono text-3xl font-bold text-emerald-900"
+            >
+              {latestYear}
             </p>
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[11px] font-semibold text-emerald-800">
+              {latestYearCount.toLocaleString('id-ID')} judul
+            </span>
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">
-            <strong className="text-rose-700">{overdueLoans.length}</strong> peminjaman
-            melewati tenggat 7 hari
+          <p
+            className="mt-1 truncate text-[11px] text-slate-500"
+            title={latestBookSample?.judul || '-'}
+          >
+            Contoh: <strong className="text-slate-700">{latestBookSample?.judul || '-'}</strong>
           </p>
         </div>
-      </div>
+      </section>
 
-      {/* Charts + Latest Benchmark Summary */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Donut Chart: Category Distribution */}
-        <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
+      {/* Visual Analytics Section: Donut Chart (Kategori / Lokasi Rak) + Bar Chart (Sebaran Tahun Terbit 2010–2026) */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        {/* Donut Chart + Detailed Percentage Breakdown Table */}
+        <section
+          aria-label="Diagram Lingkaran Distribusi Kategori dan Lokasi Rak"
+          className="rounded-2xl border border-parchment-200 bg-white p-5 shadow-sm xl:col-span-6"
+        >
+          <div className="mb-4 flex items-start justify-between gap-2">
             <div>
-              <h2 className="font-serif text-base font-bold text-slate-900">
-                Distribusi 5 Kategori Buku
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-900">
+                <MapPin className="h-3 w-3" />
+                Distribusi Kategori / Lokasi Rak
+              </span>
+              <h2 className="mt-1 font-serif text-lg font-bold text-slate-900">
+                Proporsi Buku per Kategori &amp; Zona Rak Fisik
               </h2>
               <p className="text-xs text-slate-500">
-                Sebaran {totalJudul.toLocaleString('id-ID')} judul aktif.
+                Persentase distribusi {totalJudul.toLocaleString('id-ID')} buku pada 6 zona rak:
+                Teknologi, Pertanian, Kebumian, Matematika, Sains, dan Umum.
               </p>
             </div>
-            <BookCopy className="h-4 w-4 text-slate-400" />
           </div>
 
-          <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={48}
-                  outerRadius={78}
-                  paddingAngle={3}
+          <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-12">
+            <div className="h-64 w-full md:col-span-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={rackDistributionData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={52}
+                    outerRadius={86}
+                    paddingAngle={3}
+                  >
+                    {rackDistributionData.map((entry) => (
+                      <Cell key={entry.key} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number, name: string) => {
+                      const found = rackDistributionData.find((item) => item.name === name);
+                      const pct = found ? found.percentage : 0;
+                      return [
+                        `${value.toLocaleString('id-ID')} buku (${pct}%)`,
+                        found?.fullLabel || name,
+                      ];
+                    }}
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      borderColor: '#E2E8F0',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="space-y-2 md:col-span-6">
+              {rackDistributionData.map((item) => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between rounded-xl border border-parchment-200 bg-parchment-50/60 px-3 py-2 text-xs"
                 >
-                  {categoryData.map((entry, idx) => (
-                    <Cell
-                      key={entry.name}
-                      fill={PIE_COLORS[idx % PIE_COLORS.length]}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color }}
                     />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number) => [`${value} judul`, 'Koleksi']}
-                  contentStyle={{
-                    borderRadius: '0.75rem',
-                    borderColor: '#E2E8F0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{item.key}</p>
+                      <p className="truncate text-[10px] text-slate-500">
+                        {item.rackRange}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 pl-2">
+                    <p className="font-mono font-bold text-slate-900">
+                      {item.value.toLocaleString('id-ID')} buku
+                    </p>
+                    <p className="font-mono text-[11px] font-semibold text-emerald-800">
+                      {item.percentage.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Bar Chart: 7-day Loan Trend */}
-        <div className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
-          <div className="mb-3">
-            <h2 className="font-serif text-base font-bold text-slate-900">
-              Tren Sirkulasi (7 Hari Terakhir)
-            </h2>
-            <p className="text-xs text-slate-500">
-              Peminjaman vs pengembalian harian.
-            </p>
-          </div>
-
-          <div className="h-60 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={trendData} margin={{ top: 8, right: 8, left: -18, bottom: 4 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="tanggal" tick={{ fontSize: 11, fill: '#475569' }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#64748B' }} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: '0.75rem',
-                    borderColor: '#E2E8F0',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar
-                  dataKey="peminjaman"
-                  name="Peminjaman"
-                  fill="#1E3A8A"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="pengembalian"
-                  name="Pengembalian"
-                  fill="#064E3B"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Last Benchmark Summary Panel */}
-        <div className="flex flex-col justify-between rounded-xl border border-parchment-200 bg-white p-5 shadow-sm">
+        {/* Bar Chart: Sebaran Tahun Terbit Buku (2010–2026) */}
+        <section
+          aria-label="Grafik Batang Sebaran Tahun Terbit Buku"
+          className="flex flex-col justify-between rounded-2xl border border-parchment-200 bg-white p-5 shadow-sm xl:col-span-6"
+        >
           <div>
-            <div className="flex items-center justify-between">
+            <div className="mb-4 flex items-start justify-between gap-2">
               <div>
-                <h2 className="font-serif text-base font-bold text-slate-900">
-                  Ringkasan Benchmark Terakhir
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-900">
+                  <BarChart3 className="h-3 w-3" />
+                  Rentang Tahun Terbit 2010 – 2026
+                </span>
+                <h2 className="mt-1 font-serif text-lg font-bold text-slate-900">
+                  Sebaran Tahun Terbit Buku (2010–2026)
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Metrik performa algoritma terakhir dijalankan.
+                  Distribusi jumlah judul buku berdasarkan tahun terbit pada koleksi aktif.
                 </p>
-              </div>
-              <div className="rounded-lg bg-amber-50 p-2 text-amber-700">
-                <Gauge className="h-4 w-4" />
               </div>
             </div>
 
-            {lastBenchmark ? (
-              <div className="mt-4 space-y-2.5">
-                <div className="flex items-center justify-between rounded-lg bg-parchment-50 px-3 py-2 text-xs">
-                  <span className="text-slate-500">Skala &amp; Kondisi</span>
-                  <span className="font-mono font-semibold text-slate-900">
-                    N = {lastBenchmark.scale.toLocaleString('id-ID')} ({lastBenchmark.condition})
-                  </span>
-                </div>
-                <div className="divide-y divide-parchment-100 rounded-lg border border-parchment-200">
-                  {lastBenchmark.sortMetrics.map((m) => (
-                    <div
-                      key={m.algorithmName}
-                      className="flex items-center justify-between px-3 py-2 text-xs"
-                    >
-                      <span className="font-semibold text-slate-800">
-                        {m.algorithmName}
-                      </span>
-                      <span className="font-mono text-emerald-800">
-                        {m.executionTimeMs.toFixed(2)} ms ·{' '}
-                        {m.comparisonsCount.toLocaleString('id-ID')} cmp
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl border border-dashed border-parchment-300 bg-parchment-50/70 p-4 text-xs leading-relaxed text-slate-600">
-                Belum ada sesi benchmark tersimpan. Buka <strong>Benchmark Algoritma</strong>{' '}
-                untuk menguji skala 1.000, 5.000, dan 10.000 entri buku.
-              </div>
-            )}
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={yearDistributionData}
+                  margin={{ top: 8, right: 12, left: -12, bottom: 4 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="tahun"
+                    tick={{ fontSize: 11, fill: '#475569' }}
+                    interval={0}
+                    angle={-30}
+                    textAnchor="end"
+                    height={42}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 11, fill: '#64748B' }}
+                  />
+                  <Tooltip
+                    formatter={(value: number) => [
+                      `${value.toLocaleString('id-ID')} judul buku`,
+                      'Jumlah Koleksi',
+                    ]}
+                    labelFormatter={(label) => `Tahun Terbit ${label}`}
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      borderColor: '#E2E8F0',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar
+                    dataKey="jumlah"
+                    name="Jumlah Buku"
+                    fill="#064E3B"
+                    radius={[5, 5, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => onNavigate('/benchmark')}
-            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 transition hover:bg-emerald-100"
-          >
-            <span>Buka Laboratorium Benchmark</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Recent Loans Table */}
-      <div className="overflow-hidden rounded-xl border border-parchment-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-parchment-200 px-5 py-4">
-          <div>
-            <h2 className="font-serif text-base font-bold text-slate-900">
-              5 Transaksi Peminjaman Terbaru
-            </h2>
-            <p className="text-xs text-slate-500">
-              Akses cepat status pengembalian dan kalkulasi denda berjalan.
-            </p>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200/70 bg-emerald-50/50 px-4 py-3 text-xs text-slate-700">
+            <div>
+              <span className="font-semibold text-emerald-950">
+                Terhubung Langsung ke Mesin Algoritma:
+              </span>{' '}
+              Setiap penambahan, perubahan, atau penghapusan buku di menu{' '}
+              <strong>Inventaris &amp; Uji Algoritma</strong> langsung memperbarui grafik ini.
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('/inventaris')}
+              className="inline-flex items-center gap-1 font-semibold text-emerald-900 underline decoration-emerald-600/60 underline-offset-4 hover:text-emerald-950"
+            >
+              <span>Uji Sorting &amp; Searching</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('/sirkulasi')}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900"
-          >
-            <span>Lihat Semua</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-left text-xs">
-            <thead>
-              <tr className="border-b border-parchment-200 bg-parchment-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                <th className="px-5 py-3">ID &amp; Buku</th>
-                <th className="px-5 py-3">Peminjam</th>
-                <th className="px-5 py-3">Tenggat Kembali</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Denda</th>
-                <th className="px-5 py-3 text-right">Aksi Cepat</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-parchment-100">
-              {recentLoans.map((loan) => {
-                const overdue = isLoanOverdue(loan, today);
-                const fine = getEffectiveLoanFine(loan, today);
-                return (
-                  <tr key={loan.id} className="hover:bg-parchment-50/50">
-                    <td className="px-5 py-3">
-                      <span className="font-mono text-[11px] text-slate-400">
-                        {loan.id}
-                      </span>
-                      <p className="font-serif text-sm font-semibold text-slate-900">
-                        {loan.judulBuku}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-semibold text-slate-800">{loan.namaPeminjam}</p>
-                      <p className="font-mono text-[11px] text-slate-500">
-                        {loan.nimAnggota}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3 font-mono text-slate-700">
-                      {formatDateIndo(loan.tenggatKembali)}
-                    </td>
-                    <td className="px-5 py-3">
-                      {loan.status === 'Dikembalikan' ? (
-                        <Badge variant="emerald">Dikembalikan</Badge>
-                      ) : overdue ? (
-                        <Badge variant="rose">Terlambat</Badge>
-                      ) : (
-                        <Badge variant="amber">Dipinjam</Badge>
-                      )}
-                    </td>
-                    <td className="px-5 py-3 text-right font-mono font-semibold text-slate-800">
-                      {formatRupiah(fine)}
-                    </td>
-                    <td className="px-5 py-3 text-right">
-                      {loan.status === 'Dipinjam' ? (
-                        <button
-                          type="button"
-                          onClick={() => onRequestReturn(loan)}
-                          className="rounded-lg border border-slate-200 px-3 py-1 font-semibold text-slate-700 hover:bg-emerald-900 hover:text-white"
-                        >
-                          Kembalikan
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">Selesai</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        </section>
       </div>
     </div>
   );

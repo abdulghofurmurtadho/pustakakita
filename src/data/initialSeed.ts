@@ -7,9 +7,11 @@ import {
 
 export { BOOK_CATEGORIES, COVER_COLOR_PALETTE };
 
+export const DEFAULT_BOOK_COUNT = 10000;
+
 const LOANED_BOOK_IDS = new Set(['BK-0001', 'BK-0002', 'BK-0004']);
 
-function buildInitialBooks(count: number = 1000): Book[] {
+export function buildInitialBooks(count: number = DEFAULT_BOOK_COUNT): Book[] {
   const generated = generateBooks(count);
   return generated.map((book) =>
     LOANED_BOOK_IDS.has(book.id)
@@ -19,9 +21,9 @@ function buildInitialBooks(count: number = 1000): Book[] {
 }
 
 /**
- * Default seed dataset: 1.000 unique books automatically generated when localStorage is empty.
+ * Default seed dataset: 10.000 unique realistic books automatically generated when localStorage is empty.
  */
-export const INITIAL_BOOKS: Book[] = buildInitialBooks(1000);
+export const INITIAL_BOOKS: Book[] = buildInitialBooks(DEFAULT_BOOK_COUNT);
 
 function findBookSnapshot(id: string): Book {
   for (let i = 0; i < INITIAL_BOOKS.length; i += 1) {
@@ -51,7 +53,7 @@ export const INITIAL_LOANS: LoanRecord[] = [
     tenggatKembali: '2026-11-17',
     tanggalDikembalikan: null,
     status: 'Dipinjam',
-    denda: 10000, // Terlambat 5 hari per 22 Nov 2026 (5 * Rp 2.000)
+    denda: 10000, // Terlambat 5 hari (5 * Rp 2.000)
   },
   {
     id: 'LN-0002',

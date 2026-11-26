@@ -1,6 +1,10 @@
 import React, { createContext, useCallback, useContext } from 'react';
-import { generateBooks } from '../data/bookGenerator';
-import { INITIAL_BOOKS, INITIAL_LOANS } from '../data/initialSeed';
+import { shuffleBooksArray } from '../data/bookGenerator';
+import {
+  INITIAL_BOOKS,
+  INITIAL_LOANS,
+  buildInitialBooks,
+} from '../data/initialSeed';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import {
   ActionResult,
@@ -19,8 +23,31 @@ import {
 } from '../utils/dateUtils';
 import { validateBackupPayload, validateBookInput } from '../utils/validators';
 
-export const BOOKS_STORAGE_KEY = 'pustakakita_books';
-export const LOANS_STORAGE_KEY = 'pustakakita_loans';
+export const BOOKS_STORAGE_KEY = 'pustakakita_books_v5';
+export const LOANS_STORAGE_KEY = 'pustakakita_loans_v5';
+
+// Clean up legacy localStorage keys so upgraded browsers auto-seed 10.000 shuffled books with varied Lokasi Rak
+if (typeof window !== 'undefined') {
+  try {
+    const legacyKeys = [
+      'pustakakita_books',
+      'pustakakita_loans',
+      'pustakakita_books_v2',
+      'pustakakita_loans_v2',
+      'pustakakita_books_v3',
+      'pustakakita_loans_v3',
+      'pustakakita_books_v4',
+      'pustakakita_loans_v4',
+    ];
+    for (const k of legacyKeys) {
+      if (window.localStorage.getItem(k) !== null) {
+        window.localStorage.removeItem(k);
+      }
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+}
 
 function generateNextId(prefix: string, existingIds: string[]): string {
   let maxNum = 0;
@@ -45,6 +72,8 @@ export interface LibraryContextValue {
   borrowBook: (input: LoanInput) => ActionResult<LoanRecord>;
   returnBook: (loanId: string, returnDateStr?: string) => ActionResult<LoanRecord>;
   loadPresetDataset: (count: BenchmarkScale) => ActionResult;
+  shuffleInventoryBooks: () => ActionResult;
+  applySortedSliceToInventory: (sortedSlice: Book[]) => void;
   exportBackupJson: () => string;
   importBackupJson: (jsonString: string) => ActionResult<LibraryBackupPayload>;
   resetToFactoryData: () => void;
@@ -264,20 +293,35 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
   const loadPresetDataset = useCallback(
     (count: BenchmarkScale): ActionResult => {
-      const loanedIds = new Set(['BK-0001', 'BK-0002', 'BK-0004']);
-      const generated = generateBooks(count).map((book) =>
-        loanedIds.has(book.id)
-          ? { ...book, stokTersedia: Math.max(0, book.stokTotal - 1) }
-          : book,
-      );
+      const generated = buildInitialBooks(count);
       setBooks(generated);
       setLoans(INITIAL_LOANS.map((l) => ({ ...l })));
       return {
         success: true,
-        message: `Berhasil memuat ${count.toLocaleString('id-ID')} buku unik ke katalog aktif.`,
+        message: `Berhasil memuat ${count.toLocaleString('id-ID')} buku unik (teracak) ke katalog aktif.`,
       };
     },
     [setBooks, setLoans],
+  );
+
+  const shuffleInventoryBooks = useCallback((): ActionResult => {
+    setBooks((prev) => shuffleBooksArray(prev, Date.now()));
+    return {
+      success: true,
+      message: `Seluruh ${books.length.toLocaleString('id-ID')} buku di rak inventaris berhasil diacak ulang (Fisher-Yates Shuffle).`,
+    };
+  }, [books.length, setBooks]);
+
+  const applySortedSliceToInventory = useCallback(
+    (sortedSlice: Book[]) => {
+      setBooks((prev) => {
+        if (sortedSlice.length >= prev.length) {
+          return [...sortedSlice];
+        }
+        return [...sortedSlice, ...prev.slice(sortedSlice.length)];
+      });
+    },
+    [setBooks],
   );
 
   const exportBackupJson = useCallback((): string => {
@@ -339,6 +383,8 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         borrowBook,
         returnBook,
         loadPresetDataset,
+        shuffleInventoryBooks,
+        applySortedSliceToInventory,
         exportBackupJson,
         importBackupJson,
         resetToFactoryData,

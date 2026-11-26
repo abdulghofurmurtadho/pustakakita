@@ -13,9 +13,12 @@ import {
 import {
   BinarySearchKey,
   binarySearchBooks,
+  getBookCriterionString,
+  jumpSearchBooks,
   linearSearchBooks,
 } from './searching';
 import {
+  bubbleSort,
   insertionSort,
   mergeSort,
   quickSort,
@@ -23,6 +26,7 @@ import {
 
 export interface SearchBenchmarkComparison {
   linear: SearchBenchmarkResult;
+  jump: SearchBenchmarkResult;
   binary: SearchBenchmarkResult;
 }
 
@@ -51,8 +55,9 @@ export function runSortBenchmark(
   const quickRes = quickSort(prepared, field, order);
   const mergeRes = mergeSort(prepared, field, order);
   const insertionRes = insertionSort(prepared, field, order);
+  const bubbleRes = bubbleSort(prepared, field, order);
 
-  return [quickRes.metrics, mergeRes.metrics, insertionRes.metrics];
+  return [quickRes.metrics, mergeRes.metrics, insertionRes.metrics, bubbleRes.metrics];
 }
 
 /**
@@ -98,8 +103,9 @@ export function runSearchBenchmark(
   searchKey: BinarySearchKey = 'judul',
 ): SearchBenchmarkComparison {
   const linear = linearSearchBooks(dataset, keyword, searchKey);
-  const binary = binarySearchBooks(dataset, keyword, searchKey);
-  return { linear, binary };
+  const jump = jumpSearchBooks(dataset, keyword, searchKey);
+  const binary = binarySearchBooks(dataset, keyword, searchKey, jump.sortedOrderUsed);
+  return { linear, jump, binary };
 }
 
 /**
@@ -112,18 +118,20 @@ export function runSearchPositionBenchmark(
 ): SearchPositionBenchmarkRow[] {
   if (dataset.length === 0) return [];
 
-  const sortedByField = quickSort(dataset, (a, b) => {
-    const av = a[field].trim().toLowerCase();
-    const bv = b[field].trim().toLowerCase();
-    if (av < bv) return -1;
-    if (av > bv) return 1;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  }).sorted;
+  const sortedByField = quickSort(dataset, field, 'asc').sorted;
 
-  const firstQuery = dataset[0][field];
-  const middleQuery = dataset[Math.floor(dataset.length / 2)][field];
-  const lastQuery = dataset[dataset.length - 1][field];
-  const missingQuery = field === 'isbn' ? '978-999-9999999' : 'ZZZ-BUKU-TIDAK-DITEMUKAN';
+  const firstQuery = getBookCriterionString(dataset[0], field);
+  const middleQuery = getBookCriterionString(
+    dataset[Math.floor(dataset.length / 2)],
+    field,
+  );
+  const lastQuery = getBookCriterionString(dataset[dataset.length - 1], field);
+  const missingQuery =
+    field === 'isbn'
+      ? '978-999-9999999'
+      : field === 'tahunTerbit'
+        ? '1899'
+        : 'ZZZ-BUKU-TIDAK-DITEMUKAN';
 
   const scenarios: {
     scenario: SearchPositionBenchmarkRow['scenario'];
@@ -154,6 +162,7 @@ export function runSearchPositionBenchmark(
     targetQuery: sc.targetQuery,
     field,
     linear: linearSearchBooks(dataset, sc.targetQuery, field),
+    jump: jumpSearchBooks(dataset, sc.targetQuery, field, sortedByField),
     binary: binarySearchBooks(dataset, sc.targetQuery, field, sortedByField),
   }));
 }

@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, BookOpen, Clock, Menu, PlusCircle } from 'lucide-react';
+import { BookOpen, Clock, Database, Menu, PackageCheck } from 'lucide-react';
 import { ViewRoute } from '../../types';
 
 interface NavbarProps {
-  overdueCount: number;
-  onQuickBorrow: () => void;
+  totalBooks: number;
+  currentRoute: ViewRoute;
   onNavigate: (route: ViewRoute) => void;
   onToggleMobileMenu: () => void;
 }
 
 export function Navbar({
-  overdueCount,
-  onQuickBorrow,
+  totalBooks,
+  currentRoute,
   onNavigate,
   onToggleMobileMenu,
 }: NavbarProps) {
@@ -35,6 +35,11 @@ export function Navbar({
     minute: '2-digit',
     second: '2-digit',
   });
+
+  const isInventoryActive =
+    currentRoute === '/inventaris' ||
+    currentRoute === '/katalog' ||
+    currentRoute === '/benchmark';
 
   return (
     <header className="sticky top-0 z-30 border-b border-parchment-200 bg-white/90 backdrop-blur-md">
@@ -74,17 +79,11 @@ export function Navbar({
         </div>
 
         <div className="flex items-center gap-2.5 sm:gap-3">
-          {overdueCount > 0 && (
-            <button
-              type="button"
-              onClick={() => onNavigate('/sirkulasi')}
-              className="inline-flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-              title="Lihat peminjaman yang terlambat"
-            >
-              <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
-              <span>{overdueCount} Terlambat</span>
-            </button>
-          )}
+          <div className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-semibold text-emerald-900 sm:inline-flex">
+            <Database className="h-3.5 w-3.5 text-emerald-700" />
+            <span className="font-mono">{totalBooks.toLocaleString('id-ID')}</span>
+            <span>Buku Aktif</span>
+          </div>
 
           <div className="hidden items-center gap-2 rounded-lg border border-parchment-200 bg-parchment-50 px-3 py-1.5 text-xs text-slate-600 md:flex">
             <Clock className="h-3.5 w-3.5 text-slate-500" />
@@ -95,11 +94,15 @@ export function Navbar({
 
           <button
             type="button"
-            onClick={onQuickBorrow}
+            onClick={() => onNavigate(isInventoryActive ? '/' : '/inventaris')}
             className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-900 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-950 active:scale-[0.99]"
           >
-            <PlusCircle className="h-4 w-4 text-amber-300" />
-            <span>Pinjam Buku</span>
+            <PackageCheck className="h-4 w-4 text-amber-300" />
+            <span>
+              {isInventoryActive
+                ? 'Lihat Dashboard'
+                : 'Inventaris & Uji Algoritma'}
+            </span>
           </button>
         </div>
       </div>

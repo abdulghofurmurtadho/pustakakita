@@ -32,10 +32,9 @@ export function ExecutionStepVisualizer({
               <thead>
                 <tr className="border-b border-parchment-200 bg-parchment-50/80 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <th className="px-4 py-3">Skenario Posisi</th>
-                  <th className="px-4 py-3 text-right">Linear (ms)</th>
-                  <th className="px-4 py-3 text-right">Linear Perbandingan</th>
-                  <th className="px-4 py-3 text-right">Binary (ms)</th>
-                  <th className="px-4 py-3 text-right">Binary Perbandingan</th>
+                  <th className="px-4 py-3 text-right">Linear (ms / langkah)</th>
+                  <th className="px-4 py-3 text-right">Jump √n (ms / langkah)</th>
+                  <th className="px-4 py-3 text-right">Binary (ms / langkah)</th>
                   <th className="px-4 py-3 text-center">Indeks Binary</th>
                 </tr>
               </thead>
@@ -48,17 +47,29 @@ export function ExecutionStepVisualizer({
                         Target: {row.targetQuery}
                       </p>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-700">
-                      {row.linear.executionTimeMs.toFixed(3)} ms
+                    <td className="px-4 py-3 text-right font-mono text-amber-700">
+                      {row.linear.executionTimeMs.toFixed(3)} ms ·{' '}
+                      <strong>
+                        {row.linear.comparisonsCount.toLocaleString('id-ID')}
+                      </strong>
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold text-amber-700">
-                      {row.linear.comparisonsCount.toLocaleString('id-ID')}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-800">
-                      {row.binary.executionTimeMs.toFixed(3)} ms
+                    <td className="px-4 py-3 text-right font-mono text-indigo-700">
+                      {row.jump ? (
+                        <>
+                          {row.jump.executionTimeMs.toFixed(3)} ms ·{' '}
+                          <strong>
+                            {row.jump.comparisonsCount.toLocaleString('id-ID')}
+                          </strong>
+                        </>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700">
-                      {row.binary.comparisonsCount.toLocaleString('id-ID')}
+                      {row.binary.executionTimeMs.toFixed(3)} ms ·{' '}
+                      <strong>
+                        {row.binary.comparisonsCount.toLocaleString('id-ID')}
+                      </strong>
                     </td>
                     <td className="px-4 py-3 text-center font-mono">
                       {row.binary.foundIndex !== -1 ? (
@@ -83,8 +94,10 @@ export function ExecutionStepVisualizer({
       ) : (
         <>
           {/* Side-by-side custom keyword cards */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {[comparison.linear, comparison.binary].map((res) => (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {[comparison.linear, comparison.jump, comparison.binary]
+              .filter(Boolean)
+              .map((res) => (
               <div
                 key={res.algorithm}
                 className="rounded-xl border border-parchment-200 bg-white p-5 shadow-sm"

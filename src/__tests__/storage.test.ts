@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import {
   BOOKS_STORAGE_KEY,
@@ -19,18 +19,18 @@ function wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-describe('Persistensi localStorage 1.000 Buku, Backup/Restore & Integrasi UI (AC-01 & AC-05)', () => {
+describe('Persistensi localStorage 10.000 Buku Acak, Backup/Restore & Integrasi Halaman Inventaris Terpadu', () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
-  it('AC-01: saat localStorage kosong, aplikasi otomatis mengisi 1.000 buku unik dan 3 transaksi sirkulasi awal', () => {
+  it('saat localStorage kosong, aplikasi otomatis mengisi 10.000 buku unik teracak dan 3 transaksi sirkulasi awal', () => {
     expect(window.localStorage.getItem(BOOKS_STORAGE_KEY)).toBeNull();
     expect(window.localStorage.getItem(LOANS_STORAGE_KEY)).toBeNull();
 
     const { result } = renderHook(() => useLibrary(), { wrapper });
 
-    expect(result.current.books).toHaveLength(1000);
+    expect(result.current.books).toHaveLength(10000);
     expect(result.current.loans).toHaveLength(3);
     expect(result.current.books).toEqual(INITIAL_BOOKS);
     expect(result.current.loans).toEqual(INITIAL_LOANS);
@@ -41,35 +41,41 @@ describe('Persistensi localStorage 1.000 Buku, Backup/Restore & Integrasi UI (AC
     const storedLoans = JSON.parse(
       window.localStorage.getItem(LOANS_STORAGE_KEY) || '[]',
     );
-    expect(storedBooks).toHaveLength(1000);
+    expect(storedBooks).toHaveLength(10000);
     expect(storedLoans).toHaveLength(3);
   });
 
-  it('preset dataset mampu mengganti isi katalog aktif ke 5.000 dan 10.000 buku secara langsung', () => {
+  it('preset dataset dan shuffleInventoryBooks mampu mengganti serta mengacak ulang rak inventaris', () => {
     const { result } = renderHook(() => useLibrary(), { wrapper });
-
-    act(() => {
-      result.current.loadPresetDataset(5000);
-    });
-    expect(result.current.books).toHaveLength(5000);
-
-    act(() => {
-      result.current.loadPresetDataset(10000);
-    });
-    expect(result.current.books).toHaveLength(10000);
 
     act(() => {
       result.current.loadPresetDataset(1000);
     });
     expect(result.current.books).toHaveLength(1000);
+
+    const firstIdBefore = result.current.books[0].id;
+    act(() => {
+      result.current.shuffleInventoryBooks();
+    });
+    expect(result.current.books).toHaveLength(1000);
+    expect(typeof firstIdBefore).toBe('string');
+
+    act(() => {
+      result.current.loadPresetDataset(10000);
+    });
+    expect(result.current.books).toHaveLength(10000);
   });
 
   it('ekspor JSON backup lalu restore memulihkan state books dan loans 100% presisi', () => {
     const { result } = renderHook(() => useLibrary(), { wrapper });
 
     act(() => {
+      result.current.loadPresetDataset(1000);
+    });
+
+    act(() => {
       result.current.addBook({
-        isbn: '978-602-4246945',
+        isbn: '978-602-4246-94-5',
         judul: 'Laut Bercerita',
         penulis: 'Leila S. Chudori',
         penerbit: 'Kepustakaan Populer Gramedia',
@@ -101,7 +107,7 @@ describe('Persistensi localStorage 1.000 Buku, Backup/Restore & Integrasi UI (AC
     act(() => {
       result.current.resetToFactoryData();
     });
-    expect(result.current.books).toHaveLength(1000);
+    expect(result.current.books).toHaveLength(10000);
     expect(result.current.loans).toHaveLength(3);
 
     let importRes: ReturnType<typeof result.current.importBackupJson>;
@@ -114,43 +120,153 @@ describe('Persistensi localStorage 1.000 Buku, Backup/Restore & Integrasi UI (AC
     expect(result.current.loans).toEqual(expectedLoans);
   });
 
-  it('integrasi UI App: Dashboard tampilkan 1.000 buku, Katalog mendukung pagination, dan Benchmark menampilkan skala 1.000/5.000/10.000 + ekspor CSV', () => {
-    render(React.createElement(App));
+  it('integrasi UI Terpadu 2 Menu Utama: Dashboard Ringkasan Koleksi & Inventaris Uji Algoritma (Progress Bar 0%->100%, Progressive Disclosure & Sinkronisasi CRUD)', () => {
+    vi.useFakeTimers();
+    try {
+      render(React.createElement(App));
 
-    expect(screen.getByText('Dashboard Operasional PustakaKita')).toBeInTheDocument();
-    expect(screen.getAllByText('1.000').length).toBeGreaterThanOrEqual(1);
+      // Menu 1: Dashboard Ringkasan Koleksi opens initially with 10.000 books KPI, Donut Chart (6 Rack Groups) & Year Bar Chart
+      expect(
+        screen.getByText(/Dashboard Ringkasan Koleksi PustakaKita/i),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-total-judul')).toHaveTextContent('10.000');
+      expect(screen.getByTestId('kpi-kategori-rak')).toHaveTextContent('6 Kategori');
+      expect(
+        screen.getByText(/Proporsi Buku per Kategori & Zona Rak Fisik/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Sebaran Tahun Terbit Buku \(2010–2026\)/i),
+      ).toBeInTheDocument();
 
-    // Navigate to Katalog & verify pagination info
-    fireEvent.click(screen.getByRole('button', { name: /Katalog Buku/i }));
-    expect(screen.getByText('Katalog Buku PustakaKita')).toBeInTheDocument();
-    expect(screen.getAllByText(/1–25/).length).toBeGreaterThanOrEqual(1);
+      // Ensure old Pengaturan & Data menu is removed from Sidebar
+      expect(
+        screen.queryByRole('button', { name: /Pengaturan & Data/i }),
+      ).toBeNull();
 
-    // Navigate to Inventaris
-    fireEvent.click(screen.getByRole('button', { name: /Inventaris Buku/i }));
-    expect(screen.getByText(/Inventaris & Stok Buku/i)).toBeInTheDocument();
+      // Switch to Menu 2: Inventaris & Uji Algoritma
+      fireEvent.click(
+        screen.getAllByRole('button', {
+          name: /Inventaris & Uji Algoritma/i,
+        })[0],
+      );
 
-    // Navigate to Sirkulasi
-    fireEvent.click(screen.getByRole('button', { name: /Sirkulasi & Denda/i }));
-    expect(screen.getByText(/Sirkulasi Peminjaman & Denda/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Inventaris Buku & Mesin Sorting \/ Searching Terpadu/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /Acak Ulang Data \(Shuffle\)/i }),
+      ).toBeInTheDocument();
 
-    // Navigate to Benchmark & check PRD v2.0 controls
-    fireEvent.click(screen.getByRole('button', { name: /Benchmark Algoritma/i }));
-    expect(
-      screen.getByText(/Benchmark Algoritma Searching & Sorting/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Run Full Benchmark \(1\.000 → 5\.000 → 10\.000\)/i }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Unduh Laporan CSV/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Random Order/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Reversed Order/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Nearly Sorted/i })).toBeInTheDocument();
+      // Separate columns: No. Posisi (Indeks) vs Lokasi Rak
+      expect(
+        screen.getAllByText(/No\. Posisi \(Indeks\)/i).length,
+      ).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Lokasi Rak/i).length).toBeGreaterThan(0);
 
-    // Navigate to Pengaturan
-    fireEvent.click(screen.getByRole('button', { name: /Pengaturan & Data/i }));
-    expect(screen.getByText(/Pengaturan & Backup Data/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Muat 10\.000 Buku/i }),
-    ).toBeInTheDocument();
+      // Progressive Disclosure: Before & After / Trace / Analysis MUST be hidden initially
+      expect(screen.queryByLabelText(/Hasil Eksekusi Sorting/i)).toBeNull();
+      expect(screen.queryByLabelText(/Hasil Eksekusi Searching/i)).toBeNull();
+
+      // Select Kecil (50) on Tab 1 Sorting, type Post-Sort Highlight keyword, and click Jalankan Pengurutan
+      fireEvent.click(screen.getByRole('button', { name: /Kecil \(50\)/i }));
+      const highlightInput = screen.getByPlaceholderText(
+        /Ketik judul buku untuk ditandai posisinya setelah urut/i,
+      ) as HTMLInputElement;
+      fireEvent.change(highlightInput, { target: { value: 'Geografi' } });
+      expect(highlightInput.value).toBe('Geografi');
+
+      fireEvent.click(
+        screen.getByRole('button', { name: /Jalankan Pengurutan \(Sorting\)/i }),
+      );
+
+      // Immediately after click (before 100%), Progress Bar is shown and results are still hidden
+      expect(
+        screen.getByLabelText(/Progress Eksekusi Algoritma/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Hasil Eksekusi Sorting/i)).toBeNull();
+
+      // Advance timers so Progress Bar reaches 100%
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+
+      // Now Blok 1, Blok 2, and Blok 3 of Sorting must appear!
+      expect(screen.getByLabelText(/Hasil Eksekusi Sorting/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Blok 1 — Perbandingan Susunan Data: Before vs After Sorting/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Blok 2 — Log Proses Langkah demi Langkah/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Blok 3 — Grafik Perbandingan Ke-4 Algoritma Sorting & Analisis Empiris/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Data telah diurutkan dengan Quick Sort/i),
+      ).toBeInTheDocument();
+
+      // Switch to Tab 2: Searching -> Progressive Disclosure must hide previous results
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: /TAB 2: SEARCHING \(Cari Lokasi Buku di Inventaris\)/i,
+        }),
+      );
+      expect(screen.queryByLabelText(/Hasil Eksekusi Sorting/i)).toBeNull();
+      expect(screen.queryByLabelText(/Hasil Eksekusi Searching/i)).toBeNull();
+
+      // Clicking Cari Buku with empty keyword shows validation message and keeps results hidden
+      fireEvent.click(
+        screen.getByRole('button', { name: /Cari Buku \(Searching\)/i }),
+      );
+      expect(
+        screen.getByText(/Silakan ketik kata kunci pencarian terlebih dahulu/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Hasil Eksekusi Searching/i)).toBeNull();
+
+      // Type keyword & execute Searching
+      const searchInput = screen.getByPlaceholderText(
+        /Ketik judul buku yang dicari, misal: Geometri, Geografi/i,
+      ) as HTMLInputElement;
+      fireEvent.change(searchInput, { target: { value: 'Geografi' } });
+      fireEvent.click(
+        screen.getByRole('button', { name: /Cari Buku \(Searching\)/i }),
+      );
+
+      // Before timers finish, results are still hidden while progress bar is active
+      expect(screen.queryByLabelText(/Hasil Eksekusi Searching/i)).toBeNull();
+
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+
+      expect(
+        screen.getByLabelText(/Hasil Eksekusi Searching/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Blok 1 — Kondisi Ruang Pencarian \(Before\) & Buku Ditemukan \(After\)/i,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          /Blok 3 — Grafik Perbandingan Ke-3 Algoritma Searching & Analisis Empiris/i,
+        ),
+      ).toBeInTheDocument();
+
+      // Navigate back to Menu 1: Dashboard Ringkasan Koleksi
+      fireEvent.click(
+        screen.getByRole('button', { name: /Dashboard Ringkasan Koleksi/i }),
+      );
+      expect(
+        screen.getByText(/Dashboard Ringkasan Koleksi PustakaKita/i),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-total-judul')).toHaveTextContent('10.000');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

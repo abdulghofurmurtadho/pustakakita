@@ -18,9 +18,9 @@ describe('Manajemen Inventaris & Proteksi Penghapusan pada Skala 1.000 Buku', ()
     window.localStorage.clear();
   });
 
-  it('menambahkan buku baru ke katalog 1.000 buku berhasil, dan ISBN duplikat memicu error "ISBN sudah terdaftar di sistem"', () => {
+  it('menambahkan buku baru ke katalog 10.000 buku berhasil, dan ISBN duplikat memicu error "ISBN sudah terdaftar di sistem"', () => {
     const { result } = renderHook(() => useLibrary(), { wrapper });
-    expect(result.current.books).toHaveLength(1000);
+    expect(result.current.books).toHaveLength(10000);
 
     const validInput: BookInput = {
       isbn: '978-602-9991234',
@@ -41,16 +41,17 @@ describe('Manajemen Inventaris & Proteksi Penghapusan pada Skala 1.000 Buku', ()
     });
 
     expect(addRes!.success).toBe(true);
-    expect(result.current.books).toHaveLength(1001);
+    expect(result.current.books).toHaveLength(10001);
     expect(result.current.books[0].isbn).toBe('978-602-9991234');
     expect(result.current.books[0].stokTersedia).toBe(4);
 
-    // Attempt duplicate ISBN matching BK-0001 ("978-602-0000001")
+    // Attempt duplicate ISBN matching BK-0001 ("978-602-0000-00-1")
+    const bk1Isbn = result.current.books.find((b) => b.id === 'BK-0001')!.isbn;
     let dupExact: ReturnType<typeof result.current.addBook>;
     act(() => {
       dupExact = result.current.addBook({
         ...validInput,
-        isbn: '978-602-0000001',
+        isbn: bk1Isbn,
         judul: 'Buku Duplikat',
       });
     });
@@ -68,7 +69,7 @@ describe('Manajemen Inventaris & Proteksi Penghapusan pada Skala 1.000 Buku', ()
     });
     expect(dupDigits!.success).toBe(false);
     expect(dupDigits!.message).toBe('ISBN sudah terdaftar di sistem');
-    expect(result.current.books).toHaveLength(1001);
+    expect(result.current.books).toHaveLength(10001);
   });
 
   it('menghapus buku yang sedang dipinjam aktif ditolak dengan pesan proteksi, sedangkan buku bebas pinjaman berhasil dihapus', () => {
@@ -94,7 +95,7 @@ describe('Manajemen Inventaris & Proteksi Penghapusan pada Skala 1.000 Buku', ()
 
     expect(allowedDelete!.success).toBe(true);
     expect(result.current.books.some((b) => b.id === 'BK-0003')).toBe(false);
-    expect(result.current.books).toHaveLength(999);
+    expect(result.current.books).toHaveLength(9999);
   });
 
   it('memperbarui stok buku menjaga jumlah eksemplar yang sedang dipinjam tetap akurat', () => {
